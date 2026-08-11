@@ -1,8 +1,8 @@
 const int MIC_PIN = A0;
 
 //sampling settings
-const unsigned long SAMPLE_PERIOD = 200;         // 200 us = 5 kHz
-const unsigned long RECORD_TIME = 150000000UL;   // 150 seconds
+const unsigned long SAMPLE_PERIOD = 200;         //200 us = 5 kHz
+const unsigned long RECORD_TIME = 150000000UL;   //150 seconds
 
 //baseline settings
 int baseline = 0;
