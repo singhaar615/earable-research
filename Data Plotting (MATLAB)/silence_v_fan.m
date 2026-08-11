@@ -97,7 +97,7 @@ fig = figure('Position', [100 100 900 700], 'Color', 'white');
 
 subplot(2,1,1);
 
-plot(fAxis, 10*log10(Pfan), 'LineWidth', 1);
+plot(fAxis, 10*log10(Psilence), 'LineWidth', 1);
 
 title('Teeth Grinding — Silence (Frequency Spectrum)', 'Color', 'black');
 xlabel('Frequency (Hz)', 'Color', 'black');
@@ -110,7 +110,7 @@ set(gca, 'Color', 'white', 'XColor', 'black', 'YColor', 'black');
 
 subplot(2,1,2);
 
-plot(fAxis, 10*log10(Psilence), 'LineWidth', 1, ...
+plot(fAxis, 10*log10(Pfan), 'LineWidth', 1, ...
     'Color', [0.85 0.33 0.10]);
 
 title('Teeth Grinding — Fan Noise (Frequency Spectrum)', 'Color', 'black');
