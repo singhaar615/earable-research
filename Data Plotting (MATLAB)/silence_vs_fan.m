@@ -1,6 +1,4 @@
 %% bruxism_fft_silence_vs_fan
-% New CSV layout: Sample #, Time (s), Silence, Fan -- one header row,
-% one column per condition (no more Raw/Filtered or multi-day blocks).
 clear; clc; close all;
 filename       = 'baseline.csv';   % <-- update to your actual filename
 maxDisplayFreq = 1000;             % Hz, x-axis limit on both plots
@@ -70,7 +68,8 @@ outPng = 'bruxism_silence_vs_fan_spectrum.png';
 exportgraphics(fig, outPng, 'Resolution', 200);
 
 fprintf('Saved plot to %s\n', outPng);
-%% ---------------- HELPER ----------------
+
+%%helper
 function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
 % Minimal Welch PSD estimate: Hamming-windowed segments, FFT each,
 % average the power spectra. Same idea as pwelch, no toolbox needed.
