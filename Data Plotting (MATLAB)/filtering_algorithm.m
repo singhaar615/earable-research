@@ -26,7 +26,7 @@ typeKey = strrep(dataType, ' ', '');
 col = 3 + (trial - 1) * 4 + typeOffset.(typeKey);
 data = raw(:, col);
 
-validRows = ~isnan(t) & ~isnan(data);   % drop blank/incomplete rows
+validRows = ~isnan(t) & ~isnan(data); % drop blank/incomplete rows
 t = t(validRows);
 data = data(validRows);
 
@@ -36,23 +36,22 @@ fprintf('Trial %d, Column: %s\n', trial, dataType);
 fprintf('Loaded %d samples at %d Hz (%.1f s of data)\n', N, Fs, t(end)-t(1));
 
 %% clean up signal
-data = double(data) - mean(data);   % remove DC offset
-data = detrend(data);               % remove slow drift
+data = double(data) - mean(data); % remove DC offset
+data = detrend(data); % remove slow drift
 
 %% frequency domain estimate for display
-winLen   = min(4096, 2^floor(log2(N/8)));   % adapt to trial length
+winLen = min(4096, 2^floor(log2(N/8))); % adapt to trial length
 noverlap = round(winLen/2);
-nfft     = winLen;
+nfft = winLen;
 [PxxWelch, fWelch] = welchPSD(data, winLen, noverlap, nfft, Fs);
 
-dbOffset = 15;   % shift the whole curve up by 15 dB
+dbOffset = 15; % shift the whole curve up by 15 dB
 pxx_dB_display = 10*log10(PxxWelch + eps) + dbOffset;
 
 %% bandpass via FFT bin zeroing
 Y = fft(data);
 freqAxisFull = (0:N-1) * (Fs / N);
-inBand = (freqAxisFull >= freqBand(1) & freqAxisFull <= freqBand(2)) | ...
-         (freqAxisFull >= (Fs - freqBand(2)) & freqAxisFull <= (Fs - freqBand(1)));
+inBand = (freqAxisFull >= freqBand(1) & freqAxisFull <= freqBand(2)) | (freqAxisFull >= (Fs - freqBand(2)) & freqAxisFull <= (Fs - freqBand(1)));
 Yband = Y;
 Yband(~inBand) = 0;
 bandSignal = real(ifft(Yband));
@@ -63,7 +62,7 @@ envelope = sqrt(movmean(data.^2, winSize));
 
 % baseline --> quietest baselinePct percent
 sortedEnv = sort(envelope);
-pctIdx    = max(1, round((baselinePct/100) * numel(sortedEnv)));
+pctIdx = max(1, round((baselinePct/100) * numel(sortedEnv)));
 baseline  = sortedEnv(pctIdx);
 threshold = baseline * threshMult;
 active = envelope > threshold;
@@ -71,10 +70,10 @@ rawActive = active(:);   % keep pre-merge version for duty cycle later
 
 % bridge short gaps between active stretches
 gapSamples = round(mergeGap * Fs);
-[gapStarts, gapStops] = findRuns(~active);   % runs of "not active"
+[gapStarts, gapStops] = findRuns(~active); % runs of "not active"
 for k = 1:numel(gapStarts)
     if (gapStops(k) - gapStarts(k) + 1) <= gapSamples
-        active(gapStarts(k):gapStops(k)) = true;   % fill small gap
+        active(gapStarts(k):gapStops(k)) = true; % fill small gap
     end
 end
 
@@ -83,7 +82,7 @@ end
 durations = (stops - starts + 1) / Fs;
 
 dutyCycle = zeros(size(durations));
-flatness  = zeros(size(durations));
+flatness = zeros(size(durations));
 for k = 1:numel(starts)
     dutyCycle(k) = sum(rawActive(starts(k):stops(k))) / (stops(k) - starts(k) + 1);
 
@@ -128,12 +127,10 @@ severeEligible = durations(durations > longDur);
 numMildEligible = numel(mildEligible);
 numSevereEligible = numel(severeEligible);
 
-fprintf('Bursts clearing Mild-length floor (%.2fs+): %d | clearing Severe-length floor (%.2fs+): %d\n', ...
-    shortDur, numMildEligible, longDur, numSevereEligible);
+fprintf('Bursts clearing Mild-length floor (%.2fs+): %d | clearing Severe-length floor (%.2fs+): %d\n', shortDur, numMildEligible, longDur, numSevereEligible);
 fprintf('Baseline (quietest %d%% of envelope): %.2f | Threshold (%gx): %.2f\n', ...
     baselinePct, baseline, threshMult, threshold);
-fprintf('Total active time in band: %.1f s (%.0f%% of recording)\n', ...
-    sum(active)/Fs, 100*sum(active)/numel(active));
+fprintf('Total active time in band: %.1f s (%.0f%% of recording)\n', sum(active)/Fs, 100*sum(active)/numel(active));
 
 %% decide warning level
 if numSevereEligible >= minCorroboratingBursts
