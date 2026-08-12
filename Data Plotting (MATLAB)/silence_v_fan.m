@@ -9,10 +9,7 @@ yAxisLimits    = [-20 25]; % dB, y-axis limit on both plots
 
 %% LOAD DATA
 if ~isfile(filename)
-    error(['Can''t find "%s" in the current folder (%s).\n' ...
-           'Either cd to the folder containing the CSV, or set filename ' ...
-           'to the full path, e.g. filename = ''C:\\path\\to\\%s'';'], ...
-           filename, pwd, filename);
+    error(['Can''t find "%s" in the current folder (%s).\n', filename, pwd);
 end
 
 % row 2 has the column labels we need
