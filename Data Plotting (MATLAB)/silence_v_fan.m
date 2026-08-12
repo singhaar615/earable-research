@@ -1,13 +1,10 @@
-%% bruxism_fft_silence_vs_fan
 clear; clc; close all;
 
-filename        = 'bruxism_data_log.csv';
-USE_RAW_INSTEAD = true;   % true -> analyze Raw cols instead of Filtered
+filename = 'bruxism_data_log.csv';
+USE_RAW = true;  % true -> analyze Raw cols instead of Filtered
 
 % spectrum range
-% 0-2500 Hz range just buries the real bumps in flat noise floor
-% empty [] to auto-pick (50 Hz - Filtered, full - Raw), or set manually
-maxDisplayFreq = [1000];
+maxDisplayFreq = [1000];     % [] to auto-pick (50 Hz - Filtered, full - Raw)
 yAxisLimits    = [-20 25];   % dB, y-axis limit on both plots
 
 %% LOAD DATA
@@ -18,25 +15,22 @@ if ~isfile(filename)
            filename, pwd, filename);
 end
 
-% grab just the header row that labels each column (row 2 of the file)
+% row 2 has the column labels we need
 fid = fopen(filename, 'r');
-fgetl(fid);                 % row 1: dates, not needed
+fgetl(fid);                 % row 1: dates, skip
 headerLine2 = fgetl(fid);   % row 2: Silence/Fan - Raw/Filtered labels
 fclose(fid);
 headerRow2 = strsplit(headerLine2, ',');
 
-% numeric data starts at row 3 (row 1 = dates, row 2 = column labels,
-% row 3 onward = actual samples). NumVariables is forced to match the
-% header length so trailing columns aren't silently dropped by
-% auto-detection.
+% data starts row 3
 nCols = numel(headerRow2);
 opts = delimitedTextImportOptions('NumVariables', nCols, ...
     'DataLines', [3 Inf], 'Delimiter', ',');
 opts.VariableTypes = repmat({'double'}, 1, nCols);
 M = readmatrix(filename, opts);
 
-%% ---------------- LOCATE THE SILENCE/FAN FILTERED COLUMNS ----------------
-if USE_RAW_INSTEAD
+%% find the silence/fan columns
+if USE_RAW
     keep = @(h) contains(h, 'Raw', 'IgnoreCase', true);
 else
     keep = @(h) contains(h, 'Filtered', 'IgnoreCase', true);
@@ -49,28 +43,20 @@ fprintf('Found %d Silence column(s), %d Fan column(s).\n', numel(silenceCols), n
 assert(~isempty(silenceCols) && ~isempty(fanCols), ...
     'No matching columns found — check header text / CSV layout.');
 
-% Sample rate computed from the Time column itself (don't hardcode it)
+% sample rate from the Time column
 timeCol = M(:,2);
 dt = median(diff(timeCol), 'omitnan');
 Fs = round(1/dt);
 fprintf('Detected sample rate: %d Hz\n', Fs);
 
-%% ---------------- BUILD ONE LONG SIGNAL PER CONDITION ----------------
-% Each day's column has a different amount of *real* data (the rest is
-% pre-populated blank template rows -> NaN), so each day is trimmed to its
-% own valid samples and has its own DC/baseline offset removed BEFORE
-% concatenating, avoiding cross-day offset jumps in the combined signal.
+%% build one long signal per condition
 silenceSignal = extractAndConcat(M, silenceCols);
 fanSignal     = extractAndConcat(M, fanCols);
 
 fprintf('Total Silence samples: %d (%.1f s)\n', numel(silenceSignal), numel(silenceSignal)/Fs);
 fprintf('Total Fan samples: %d (%.1f s)\n', numel(fanSignal), numel(fanSignal)/Fs);
 
-%% ---------------- FREQUENCY DOMAIN VIA WELCH'S METHOD ----------------
-% Welch's method (segment -> window -> FFT -> average) gives a stable
-% spectrum without building one giant FFT over the whole concatenated
-% signal, and stays fast even with this much data. Implemented here with
-% plain fft() so it doesn't require the Signal Processing Toolbox.
+%% frequency domain via Welch's method
 winLen   = 4096;                 % ~0.82 s window at 5 kHz
 noverlap = round(winLen/2);
 nfft     = winLen;
@@ -78,13 +64,9 @@ nfft     = winLen;
 [Psilence, fAxis] = welchPSD(silenceSignal, winLen, noverlap, nfft, Fs);
 [Pfan, ~]         = welchPSD(fanSignal,     winLen, noverlap, nfft, Fs);
 
-%% ---------------- PLOT ----------------
-% Plotted in dB: the "Filtered" signal is a non-negative envelope, so even
-% after removing each day's mean there's a large low-frequency component
-% that would swamp everything else on a linear scale. dB compresses that
-% dynamic range so smaller peaks elsewhere in the spectrum are visible too.
+%% plot
 if isempty(maxDisplayFreq)
-    if USE_RAW_INSTEAD
+    if USE_RAW
         plotMaxFreq = Fs/2;
     else
         plotMaxFreq = 50;
@@ -96,51 +78,27 @@ end
 fig = figure('Position', [100 100 900 700], 'Color', 'white');
 
 subplot(2,1,1);
-
-plot(fAxis, 10*log10(Pfan), 'LineWidth', 1);
-
-title('Teeth Grinding — Silence (Frequency Spectrum)', 'Color', 'black');
-xlabel('Frequency (Hz)', 'Color', 'black');
-ylabel('Decibels (dB)', 'Color', 'black');
-grid on;
-xlim([0 plotMaxFreq]);
-ylim(yAxisLimits);
-
-set(gca, 'Color', 'white', 'XColor', 'black', 'YColor', 'black');
+plotSpectrum(fAxis, Pfan, 'Teeth Grinding — Silence (Frequency Spectrum)', ...
+    [0 0.4470 0.7410], plotMaxFreq, yAxisLimits);
 
 subplot(2,1,2);
-
-plot(fAxis, 10*log10(Psilence), 'LineWidth', 1, ...
-    'Color', [0.85 0.33 0.10]);
-
-title('Teeth Grinding — Fan Noise (Frequency Spectrum)', 'Color', 'black');
-xlabel('Frequency (Hz)', 'Color', 'black');
-ylabel('Decibels (dB)', 'Color', 'black');
-grid on;
-xlim([0 plotMaxFreq]);
-ylim(yAxisLimits);
-
-set(gca, 'Color', 'white', 'XColor', 'black', 'YColor', 'black');
+plotSpectrum(fAxis, Psilence, 'Teeth Grinding — Fan Noise (Frequency Spectrum)', ...
+    [0.85 0.33 0.10], plotMaxFreq, yAxisLimits);
 
 sgtitle('Bruxism Signal: Silence vs Fan Noise — Dominant Frequency Comparison', ...
     'Color', 'black');
 
 outPng = 'bruxism_silence_vs_fan_spectrum.png';
-
 exportgraphics(fig, outPng, 'Resolution', 200);
-
 fprintf('Saved plot to %s\n', outPng);
 
 %% ---------------- HELPERS ----------------
 function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
-    % Minimal Welch's-method PSD estimate using only base MATLAB (fft):
-    % segment the signal, apply a Hamming window, FFT each segment, and
-    % average the resulting power spectra. Equivalent in spirit to
-    % Signal Processing Toolbox's pwelch, without requiring the toolbox.
+    % segment -> window -> FFT -> average (no toolbox needed)
     x = x(:);
     n = (0:winLen-1)';
     win = 0.54 - 0.46*cos(2*pi*n/(winLen-1));  % Hamming window
-    U = sum(win.^2);                            % window power, for normalization
+    U = sum(win.^2);   % window power, for normalization
 
     step = winLen - noverlap;
     numSegs = floor((length(x) - winLen)/step) + 1;
@@ -154,7 +112,7 @@ function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
         X = fft(seg, nfft);
         Xh = X(1:halfN);
         Pk = (abs(Xh).^2) / (Fs*U);
-        Pk(2:end-1) = 2*Pk(2:end-1);             % fold negative-frequency energy in
+        Pk(2:end-1) = 2*Pk(2:end-1);   % fold negative freqs in
         Pxx = Pxx + Pk;
     end
     Pxx = Pxx / numSegs;
@@ -162,8 +120,7 @@ function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
 end
 
 function sigOut = extractAndConcat(M, cols)
-    % Pulls each day's column, drops the pre-populated NaN tail, removes
-    % that day's own baseline, and appends it to the running signal.
+    % each day: drop NaN tail, remove that day's own baseline, append
     sigOut = [];
     for c = cols
         col = M(:,c);
@@ -174,4 +131,16 @@ function sigOut = extractAndConcat(M, cols)
         col = col - mean(col);
         sigOut = [sigOut; col]; %#ok<AGROW>
     end
+end
+
+function plotSpectrum(fAxis, Pxx, titleStr, lineColor, plotMaxFreq, yAxisLimits)
+    % one spectrum subplot, styled consistently
+    plot(fAxis, 10*log10(Pxx), 'LineWidth', 1, 'Color', lineColor);
+    title(titleStr, 'Color', 'black');
+    xlabel('Frequency (Hz)', 'Color', 'black');
+    ylabel('Decibels (dB)', 'Color', 'black');
+    grid on;
+    xlim([0 plotMaxFreq]);
+    ylim(yAxisLimits);
+    set(gca, 'Color', 'white', 'XColor', 'black', 'YColor', 'black');
 end
