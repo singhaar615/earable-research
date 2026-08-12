@@ -1,27 +1,24 @@
-%% bruxism_warning_simple.m
-% Reads daily_log.csv, analyzes one selected Trial+Type column, prints a
-% 3-level warning (No Warning / Mild / Severe). Base MATLAB only.
+% 3-level warning (No Warning / Mild / Severe)
+% MATLAB only
 
 clear; clc; close all;
 
-%% ---- Settings ----
-filename    = 'daily_log.csv';
-trial       = 1;          % trial block (1, 2, 3)
-dataType    = 'No Warning';     % 'Severe', 'Mild', or 'No Warning'
+%% thresholds
+filename = 'daily_log.csv';
+trial = 1; % trial block (1, 2, 3)
+dataType = 'No Warning'; % 'Severe', 'Mild', or 'No Warning'
 
-freqBand    = [20 80];      % Hz, grinding band -- from silence-condition FFT peak cluster
-shortDur    = 0.25;          % s, below this = noise (ignore)
-longDur     = 1.5;           % s, above this = SEVERE (clinical phasic/tonic cutoff, Lavigne et al.)
-threshMult  = 2;             % burst = envelope > threshMult x quiet baseline
-baselinePct = 8;            % baseline = quietest 10% of envelope (median fails for nonstop grinding)
-mergeGap    = 0.1;          % s, gaps shorter than this get bridged into one stretch
-minDutyCycle = 0.6;          % bridged stretch must be actively active this fraction of its span
-                             % (filters out sparse bridged speech pulses)
-minSpectralFlatness = 0.4;   % grinding = broadband noise (flatness~1), speech = tonal (flatness~0)
-minCorroboratingBursts = 2;  % need >=N qualifying bursts before a tier actually fires
-                             % (one stray burst, e.g. a consonant, shouldn't trip a warning)
+freqBand = [20 80];  %grinding band (HZ)
+shortDur = 0.25;
+longDur = 1.5;
+threshMult = 2;
+baselinePct = 8;
+mergeGap = 0.1;
+minDutyCycle = 0.6;
+minSpectralFlatness = 0.4;
+minCorroboratingBursts = 2;
 
-%% ---- 1. Load data (numeric matrix, skip 2 header rows) ----
+%% load data
 raw = readmatrix(filename, 'NumHeaderLines', 2);
 
 t = raw(:,2);   % Time (s) is always column B
