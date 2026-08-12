@@ -40,7 +40,6 @@ data = double(data) - mean(data);   % remove DC offset
 data = detrend(data);               % remove slow drift
 
 %% frequency domain estimate for display
-
 winLen   = min(4096, 2^floor(log2(N/8)));   % adapt to trial length
 noverlap = round(winLen/2);
 nfft     = winLen;
@@ -68,25 +67,19 @@ pctIdx    = max(1, round((baselinePct/100) * numel(sortedEnv)));
 baseline  = sortedEnv(pctIdx);
 threshold = baseline * threshMult;
 active = envelope > threshold;
+rawActive = active(:);   % keep pre-merge version for duty cycle later
 
-% bridge short gaps
-rawActive = active(:);
+% bridge short gaps between active stretches
 gapSamples = round(mergeGap * Fs);
-active = active(:);
-gapEdges = diff([0; ~active; 0]);
-gapStarts = find(gapEdges == 1);
-gapStops  = find(gapEdges == -1) - 1;
+[gapStarts, gapStops] = findRuns(~active);   % runs of "not active"
 for k = 1:numel(gapStarts)
     if (gapStops(k) - gapStarts(k) + 1) <= gapSamples
-        active(gapStarts(k):gapStops(k)) = true;
+        active(gapStarts(k):gapStops(k)) = true;   % fill small gap
     end
-    
 end
 
 % locate active stretches; keep only genuinely active
-edges  = diff([0; active; 0]);
-starts = find(edges == 1);
-stops  = find(edges == -1) - 1;
+[starts, stops] = findRuns(active);
 durations = (stops - starts + 1) / Fs;
 
 dutyCycle = zeros(size(durations));
@@ -96,7 +89,6 @@ for k = 1:numel(starts)
 
     % spectral flatness (geo mean / arith mean of power spectrum)
     % near 1 = broadband (grinding), near 0 = tonal (voiced speech)
-    
     seg = data(starts(k):stops(k));
     if numel(seg) >= 8
         Pseg = abs(fft(seg)).^2;
@@ -105,24 +97,20 @@ for k = 1:numel(starts)
     else
         flatness(k) = 0;   % too short to trust
     end
-    
 end
 
 validBurst = (dutyCycle >= minDutyCycle) & (flatness >= minSpectralFlatness);
 
 % printout of every candidate burst, pass or fail.
 fprintf('\n Burst candidates (before filters)\n');
-
 for k = 1:numel(starts)
     passFail = 'FAIL';
     if validBurst(k)
         passFail = 'PASS';
     end
-    
     fprintf('  Burst %2d: duration = %.3f s, duty cycle = %.0f%%, flatness = %.2f [%s]\n', ...
         k, durations(k), dutyCycle(k)*100, flatness(k), passFail);
 end
-
 if isempty(starts)
     fprintf('  (none found)\n');
 end
@@ -159,53 +147,33 @@ end
 fprintf('\nLongest continuous grinding-band activity: %.2f s\n', longestBurst);
 fprintf('==> %s\n\n', upper(warningLevel));
 
-%% plot (time domain (top), frequency domain (bottom))
+%% plot (time domain top, frequency domain bottom)
 fig = figure('Color', 'white');
 
 subplot(2,1,1);
-
-plot(t, data, 'Color', [0.6 0.6 0.6]); 
+plot(t, data, 'Color', [0.6 0.6 0.6]);
 hold on;
-
 plot(t, bandSignal, 'Color', [0.30 0.60 1.00], 'LineWidth', 1.2);
-
 xlabel('Time (s)', 'Color', 'black');
 ylabel('Amplitude', 'Color', 'black');
 title('Time Domain', 'Color', 'black');
-
 legend('Raw signal', sprintf('%d-%d Hz band', freqBand(1), freqBand(2)), ...
     'TextColor', 'black', 'Color', 'white');
-
 grid on;
-
-set(gca, 'Color', 'white', ...
-    'XColor', 'black', ...
-    'YColor', 'black');
-
+styleAxesLight(gca);
 
 subplot(2,1,2);
-
-plot(fWelch, pxx_dB_display, ...
-    'Color', [0.30 0.60 1.00], ...
-    'LineWidth', 1.2);
-
+plot(fWelch, pxx_dB_display, 'Color', [0.30 0.60 1.00], 'LineWidth', 1.2);
 hold on;
-
 xline(freqBand(1), '--', 'Color', [1 0.3 0.3]);
 xline(freqBand(2), '--', 'Color', [1 0.3 0.3]);
-
 xlim([0 1000]);
 ylim([-2 22]);              % Fixed y-axis range
-
 xlabel('Frequency (Hz)', 'Color', 'black');
 ylabel('Decibels (dB)', 'Color', 'black');
 title('Frequency Domain', 'Color', 'black');
-
 grid on;
-
-set(gca, 'Color', 'white', ...
-    'XColor', 'black', ...
-    'YColor', 'black');
+styleAxesLight(gca);
 
 %% Welch's method
 function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
@@ -233,13 +201,15 @@ function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
     f = (0:halfN-1)' * (Fs/nfft);
 end
 
-function styleAxesDark(ax)
-    ax.Color = 'k';
-    ax.XColor = 'w';
-    ax.YColor = 'w';
-    ax.GridColor = 'w';
-    ax.GridAlpha = 0.25;
-    ax.Title.Color = 'w';
-    ax.FontSize = 10;
-    ax.Box = 'on';
+% find start/stop indices of each run of "true" in a logical vector
+function [starts, stops] = findRuns(vec)
+    vec = vec(:);
+    edges = diff([0; vec; 0]);
+    starts = find(edges == 1);
+    stops  = find(edges == -1) - 1;
+end
+
+% white background, black text/axes (used for both subplots)
+function styleAxesLight(ax)
+    set(ax, 'Color', 'white', 'XColor', 'black', 'YColor', 'black');
 end
