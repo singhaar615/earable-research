@@ -26,7 +26,7 @@ def load_amplitudes(filepath):
 #initialize
 datasets = [
     ("sound_intensity_data.txt", "lightblue", "blue", "Open Ear (No Occlusion)"),
-    ("in_ear_sound_data.txt",    "pink",      "red",  "Ear Canal (Occluded)"),
+    ("in_ear_sound_data.txt", "pink", "red", "Ear Canal (Occluded)"),
 ]
 
 #plot
