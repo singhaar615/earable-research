@@ -4,7 +4,7 @@ filename = 'bruxism_data_log.csv';
 USE_RAW = true;  % true -> analyze Raw cols instead of Filtered
 
 % spectrum range
-maxDisplayFreq = [1000]; % [] to auto-pick (50 Hz - Filtered, full - Raw)
+maxDisplayFreq = [1000]; % leave empty to show full
 yAxisLimits    = [-20 25]; % dB, y-axis limit on both plots
 
 %% LOAD DATA
