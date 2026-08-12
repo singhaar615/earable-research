@@ -15,7 +15,7 @@ end
 % row 2 has the column labels we need
 fid = fopen(filename, 'r');
 fgetl(fid); % row 1: dates, skip
-headerLine2 = fgetl(fid);   % row 2: Silence/Fan - Raw/Filtered labels
+headerLine2 = fgetl(fid);   % row 2
 fclose(fid);
 headerRow2 = strsplit(headerLine2, ',');
 
