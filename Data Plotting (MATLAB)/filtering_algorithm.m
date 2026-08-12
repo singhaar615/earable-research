@@ -1,6 +1,3 @@
-% 3-level warning (No Warning / Mild / Severe)
-% MATLAB only
-
 clear; clc; close all;
 
 %% thresholds
@@ -23,10 +20,9 @@ raw = readmatrix(filename, 'NumHeaderLines', 2);
 
 t = raw(:,2);   % Time (s) is always column B
 
-% Column layout: A=Sample#, B=Time, then repeating 4-col blocks per
-% trial (Severe, Mild, No Warning, blank spacer), starting at column C.
+% data layout: A = Sample#, B = Time, then repeating 4-col blocks per trial (Severe, Mild, No Warning, blank column), starting at column C
 typeOffset = struct('Severe', 0, 'Mild', 1, 'NoWarning', 2);
-typeKey = strrep(dataType, ' ', '');   % 'No Warning' -> 'NoWarning' for struct lookup
+typeKey = strrep(dataType, ' ', '');
 col = 3 + (trial - 1) * 4 + typeOffset.(typeKey);
 data = raw(:, col);
 
@@ -39,18 +35,13 @@ N  = numel(data);
 fprintf('Trial %d, Column: %s\n', trial, dataType);
 fprintf('Loaded %d samples at %d Hz (%.1f s of data)\n', N, Fs, t(end)-t(1));
 
-%% ---- 2. Clean up signal ----
+%% clean up signal
 data = double(data) - mean(data);   % remove DC offset
 data = detrend(data);               % remove slow drift
 
-%% ---- 3. Frequency-domain estimate for DISPLAY ONLY ----
-% Detection (steps 4-6 below) still runs on the raw single-FFT band
-% mask, untouched. For the plot, a single un-averaged FFT over an entire
-% ~80s trial is extremely noisy bin-to-bin (that's what made the old
-% plot unreadable). Welch's method -- segment, window, FFT, average --
-% is the same technique already used in the silence-vs-fan script, so
-% this plot is now directly comparable to those. No toolbox required.
-winLen   = min(4096, 2^floor(log2(N/8)));   % adapt to trial length, power of 2
+%% frequency domain estimate for display
+
+winLen   = min(4096, 2^floor(log2(N/8)));   % adapt to trial length
 noverlap = round(winLen/2);
 nfft     = winLen;
 [PxxWelch, fWelch] = welchPSD(data, winLen, noverlap, nfft, Fs);
@@ -58,7 +49,7 @@ nfft     = winLen;
 dbOffset = 15;   % shift the whole curve up by 15 dB
 pxx_dB_display = 10*log10(PxxWelch + eps) + dbOffset;
 
-%% ---- 4. Bandpass via FFT bin zeroing (toolbox-free filter) ----
+%% bandpass via FFT bin zeroing
 Y = fft(data);
 freqAxisFull = (0:N-1) * (Fs / N);
 inBand = (freqAxisFull >= freqBand(1) & freqAxisFull <= freqBand(2)) | ...
@@ -67,23 +58,18 @@ Yband = Y;
 Yband(~inBand) = 0;
 bandSignal = real(ifft(Yband));
 
-%% ---- 5. Burst detection on raw broadband envelope ----
-% Detection uses raw signal loudness, not the band-passed signal --
-% Severe vs Mild/No Warning differ ~8x in raw amplitude but that gap
-% disappears once filtered to just 80-160 Hz (broadband, not tonal).
+%% burst detection on raw broadband envelope
 winSize  = round(0.05 * Fs);
 envelope = sqrt(movmean(data.^2, winSize));
 
-% Baseline = quietest baselinePct% of envelope, not median (median
-% breaks for nonstop grinding, where most of the recording is loud).
+% baseline --> quietest baselinePct percent
 sortedEnv = sort(envelope);
 pctIdx    = max(1, round((baselinePct/100) * numel(sortedEnv)));
 baseline  = sortedEnv(pctIdx);
 threshold = baseline * threshMult;
 active = envelope > threshold;
 
-% Bridge short gaps so continuous grinding isn't fragmented into many
-% sub-threshold dips.
+% bridge short gaps
 rawActive = active(:);
 gapSamples = round(mergeGap * Fs);
 active = active(:);
@@ -94,10 +80,10 @@ for k = 1:numel(gapStarts)
     if (gapStops(k) - gapStarts(k) + 1) <= gapSamples
         active(gapStarts(k):gapStops(k)) = true;
     end
+    
 end
 
-% Find active stretches, then keep only ones that are genuinely active
-% most of their own span (real grinding, not bridged speech pulses).
+% locate active stretches; keep only genuinely active
 edges  = diff([0; active; 0]);
 starts = find(edges == 1);
 stops  = find(edges == -1) - 1;
@@ -108,8 +94,9 @@ flatness  = zeros(size(durations));
 for k = 1:numel(starts)
     dutyCycle(k) = sum(rawActive(starts(k):stops(k))) / (stops(k) - starts(k) + 1);
 
-    % Spectral flatness (geo mean / arith mean of power spectrum):
-    % near 1 = broadband/noisy (grinding), near 0 = tonal (voiced speech).
+    % spectral flatness (geo mean / arith mean of power spectrum)
+    % near 1 = broadband (grinding), near 0 = tonal (voiced speech)
+    
     seg = data(starts(k):stops(k));
     if numel(seg) >= 8
         Pseg = abs(fft(seg)).^2;
@@ -118,20 +105,24 @@ for k = 1:numel(starts)
     else
         flatness(k) = 0;   % too short to trust
     end
+    
 end
 
 validBurst = (dutyCycle >= minDutyCycle) & (flatness >= minSpectralFlatness);
 
-% Diagnostic printout of every candidate burst, pass or fail.
-fprintf('\n--- Burst candidates (before filters) ---\n');
+% printout of every candidate burst, pass or fail.
+fprintf('\n Burst candidates (before filters)\n');
+
 for k = 1:numel(starts)
     passFail = 'FAIL';
     if validBurst(k)
         passFail = 'PASS';
     end
+    
     fprintf('  Burst %2d: duration = %.3f s, duty cycle = %.0f%%, flatness = %.2f [%s]\n', ...
         k, durations(k), dutyCycle(k)*100, flatness(k), passFail);
 end
+
 if isempty(starts)
     fprintf('  (none found)\n');
 end
@@ -143,11 +134,10 @@ else
     longestBurst = max(durations);
 end
 
-% Count qualifying bursts per tier (mildEligible includes severe-length
-% bursts too, since those clear the mild floor as well).
-mildEligible   = durations(durations >= shortDur);
+% count qualifying bursts per tier
+mildEligible = durations(durations >= shortDur); %include severe-length
 severeEligible = durations(durations > longDur);
-numMildEligible   = numel(mildEligible);
+numMildEligible = numel(mildEligible);
 numSevereEligible = numel(severeEligible);
 
 fprintf('Bursts clearing Mild-length floor (%.2fs+): %d | clearing Severe-length floor (%.2fs+): %d\n', ...
@@ -157,9 +147,7 @@ fprintf('Baseline (quietest %d%% of envelope): %.2f | Threshold (%gx): %.2f\n', 
 fprintf('Total active time in band: %.1f s (%.0f%% of recording)\n', ...
     sum(active)/Fs, 100*sum(active)/numel(active));
 
-%% ---- 6. Decide warning level ----
-% A tier only fires with >=minCorroboratingBursts qualifying bursts --
-% a single stray burst that slips past the filters won't trip it alone.
+%% decide warning level
 if numSevereEligible >= minCorroboratingBursts
     warningLevel = 'Severe Warning';
 elseif numMildEligible >= minCorroboratingBursts
@@ -171,7 +159,7 @@ end
 fprintf('\nLongest continuous grinding-band activity: %.2f s\n', longestBurst);
 fprintf('==> %s\n\n', upper(warningLevel));
 
-%% ---- 7. Plot: time domain (top), frequency domain (bottom) ----
+%% plot (time domain (top), frequency domain (bottom))
 fig = figure('Color', 'white');
 
 subplot(2,1,1);
@@ -219,15 +207,8 @@ set(gca, 'Color', 'white', ...
     'XColor', 'black', ...
     'YColor', 'black');
 
-%% ---- HELPERS ----
+%% Welch's method
 function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
-    % Minimal Welch's-method PSD estimate using only base MATLAB (fft):
-    % segment the signal, apply a Hamming window, FFT each segment, and
-    % average the resulting power spectra. Same technique used in the
-    % silence-vs-fan script, so this plot is now on equal footing with
-    % those -- no significant spectral content is discarded, it's just
-    % averaged across overlapping windows instead of shown as one huge
-    % single-shot FFT.
     x = x(:);
     n = (0:winLen-1)';
     win = 0.54 - 0.46*cos(2*pi*n/(winLen-1));  % Hamming window
@@ -253,8 +234,6 @@ function [Pxx, f] = welchPSD(x, winLen, noverlap, nfft, Fs)
 end
 
 function styleAxesDark(ax)
-    % Same dark-background / light-gridline styling used in the
-    % silence-vs-fan script, so figures look consistent side by side.
     ax.Color = 'k';
     ax.XColor = 'w';
     ax.YColor = 'w';
