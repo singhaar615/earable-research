@@ -1,35 +1,35 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# ── Configuration ────────────────────────────────────────────────────────────
 SAMPLE_MS  = 10
 WINDOW_MS  = 200
 
-# ── Helper to load data ───────────────────────────────────────────────────────
+#load data
 def load_amplitudes(filepath):
     amplitudes = []
+
     with open(filepath, "r") as f:
         for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            parts = line.split()
+            parts = line.strip().split()
+
             if len(parts) == 3:
                 try:
                     amplitudes.append(int(parts[2]))
                 except ValueError:
-                    pass
-    if not amplitudes:
+                    continue #skip invalid values
+
+    if len(amplitudes) == 0:
         raise ValueError(f"No valid data found in {filepath}.")
+
     return np.array(amplitudes)
 
-# ── Load both datasets ────────────────────────────────────────────────────────
+#initialize
 datasets = [
-    ("no_ear_snap_data.txt", "#1f6fbf", "Open Ear (No Occlusion)"),
-    ("snapping_data.txt", "#801e2e", "Ear Canal (Occluded)"),
+    ("sound_intensity_data.txt", "lightblue", "blue", "Open Ear (No Occlusion)"),
+    ("in_ear_sound_data.txt", "pink", "red", "Ear Canal (Occluded)"),
 ]
 
-# ── Plot ───────────────────────────────────────────────────────────────────────
+#plotting
 fig, axes = plt.subplots(2, 1, figsize=(12, 12), sharex=True, sharey=True)
 
 for ax, (filepath, raw_color, title) in zip(axes, datasets):
