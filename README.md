@@ -8,13 +8,13 @@ Sleep bruxism is typically diagnosed via polysomnography (PSG), which is expensi
 
 The pipeline spans three layers:
 
-- **Hardware** — an Arduino-based in-ear MEMS microphone rig for raw audio data collection
-- **Signal processing** — MATLAB scripts for filtering, burst detection, and spectral analysis
-- **Classification** — a lightweight warning algorithm that flags grinding events as No Warning / Mild / Severe
+- **Hardware**: an Arduino-based in-ear MEMS microphone rig for raw audio data collection
+- **Signal processing**: MATLAB scripts for filtering, burst detection, and spectral analysis
+- **Classification**: a lightweight warning algorithm that flags grinding events as No Warning / Mild / Severe
 
 ## Background & Motivation
 
-Occlusion testing (mic near the jaw vs. mic sealed in-ear) showed that in-ear placement produced a substantially stronger grinding signal than external placement — and was more comfortable — so all subsequent data collection used in-ear placement.
+Occlusion testing (mic near the jaw vs. mic sealed in-ear) showed that in-ear placement produced a substantially stronger grinding signal than external placement, so all subsequent data collection used in-ear placement.
 
 Detection logic was informed by a review of PSG-based bruxism severity literature, whose burst-detection thresholds and two-factor severity structure (episode count vs. duration) shaped the design of this project's own detection algorithm.
 
