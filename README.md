@@ -22,9 +22,9 @@ Detection logic was informed by a review of PSG-based bruxism severity literatur
 
 | Script | Purpose |
 |---|---|
-| `bruxism_fft_analysis.m` | Full analysis pipeline — burst detection, STFT spectrograms, Butterworth bandpass filtering |
-| `bruxism_warning_simple.m` | MATLAB only (no toolboxes) classifier — reads `daily_log.csv`, isolates the grinding band, detects bursts via envelope thresholding, applies duty-cycle/spectral-flatness speech rejection, and issues a Mild/Severe warning when corroborating bursts are found |
-
+| `filtering_algorithm.m` | Detects teeth-grinding bursts from a single acoustic trial. Bandpasses the raw signal to the grinding band, builds an envelope, and flags "active" stretches using an adaptive baseline threshold, scoring each candidate burst on duty cycle and spectral flatness to reject non-grinding noise. Classifies the trial as No/Mild/Severe Warning based on burst count and duration, and plots the time-domain and frequency-domain (Welch PSD) views. |
+| `silence_v_fan.m` | Compares the frequency spectrum of grinding recordings made in silence vs. with fan noise present. Concatenates matching Raw (or Filtered) columns per condition across multiple days, computes a Welch PSD for each, and plots the two spectra side by side to check whether fan noise masks or shifts the grinding signature. |
+| `updated_fft.ino` | Arduino sketch that samples the earable's microphone at 5 kHz for 150 seconds, tracking a slowly-updating baseline (rolling average) to subtract out DC drift. Applies a fixed noise floor to the deviation from baseline and streams both the raw and processed values over serial as CSV. All data collected from this was used in filtering/analysis in MATLAB. |
 
 ## Known Limitations
 
